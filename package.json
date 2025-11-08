@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "keycloak-admin": "^1.14.22"
+  }
+}
