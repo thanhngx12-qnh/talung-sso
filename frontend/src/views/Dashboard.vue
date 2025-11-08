@@ -1,56 +1,29 @@
-<!-- frontend/src/views/Dashboard.vue - Dashboard page -->
+<!-- frontend/src/views/Dashboard.vue - Updated with Sidebar component -->
 <template>
   <div class="dashboard-container">
     <div class="container-fluid">
       <div class="row">
-        <!-- Sidebar -->
-        <div class="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse">
-          <div class="position-sticky pt-3">
-            <div class="sidebar-header p-3 border-bottom border-secondary">
-              <h5 class="text-white mb-0">
-                <i class="bi bi-shield-lock me-2"></i>
-                SSO Admin
-              </h5>
-              <small class="text-muted">Tà Lùng Logistics</small>
-            </div>
-            
-            <ul class="nav flex-column mb-2">
-              <li class="nav-item">
-                <router-link to="/dashboard" class="nav-link active text-white">
-                  <i class="bi bi-speedometer2 me-2"></i>
-                  Dashboard
-                </router-link>
-              </li>
-              <li class="nav-item">
-                <router-link to="/users" class="nav-link text-white">
-                  <i class="bi bi-people me-2"></i>
-                  Quản lý người dùng
-                </router-link>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link text-white" href="#">
-                  <i class="bi bi-building me-2"></i>
-                  Quản lý nhóm
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link text-white" href="#">
-                  <i class="bi bi-shield-check me-2"></i>
-                  Quản lý vai trò
-                </a>
-              </li>
-            </ul>
-          </div>
-        </div>
-
+        <!-- Sidebar Component -->
+        <Sidebar />
+        
         <!-- Main content -->
-        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
           <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
             <h1 class="h2">Dashboard</h1>
             <div class="btn-toolbar mb-2 mb-md-0">
-              <button class="btn btn-outline-secondary" @click="logout">
-                <i class="bi bi-box-arrow-right me-1"></i>
-                Đăng xuất
+              <div class="btn-group me-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-download me-1"></i>
+                  Export
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-filter me-1"></i>
+                  Filter
+                </button>
+              </div>
+              <button class="btn btn-sm btn-outline-secondary dropdown-toggle">
+                <i class="bi bi-calendar me-1"></i>
+                This week
               </button>
             </div>
           </div>
@@ -64,6 +37,7 @@
                     <div>
                       <h5 class="card-title">Tổng người dùng</h5>
                       <h2 class="mb-0">{{ stats.totalUsers }}</h2>
+                      <small class="opacity-75">+2 từ tuần trước</small>
                     </div>
                     <div class="align-self-center">
                       <i class="bi bi-people fs-1 opacity-50"></i>
@@ -80,6 +54,7 @@
                     <div>
                       <h5 class="card-title">Active Sessions</h5>
                       <h2 class="mb-0">{{ stats.activeSessions }}</h2>
+                      <small class="opacity-75">Đang hoạt động</small>
                     </div>
                     <div class="align-self-center">
                       <i class="bi bi-person-check fs-1 opacity-50"></i>
@@ -96,6 +71,7 @@
                     <div>
                       <h5 class="card-title">Ứng dụng</h5>
                       <h2 class="mb-0">{{ stats.applications }}</h2>
+                      <small class="opacity-75">Đã tích hợp</small>
                     </div>
                     <div class="align-self-center">
                       <i class="bi bi-app-indicator fs-1 opacity-50"></i>
@@ -112,6 +88,7 @@
                     <div>
                       <h5 class="card-title">Hôm nay</h5>
                       <h2 class="mb-0">{{ stats.todayLogins }}</h2>
+                      <small class="opacity-75">Lượt đăng nhập</small>
                     </div>
                     <div class="align-self-center">
                       <i class="bi bi-graph-up fs-1 opacity-50"></i>
@@ -122,35 +99,96 @@
             </div>
           </div>
 
-          <!-- Recent Activity -->
+          <!-- Charts and Recent Activity -->
           <div class="row">
-            <div class="col-12">
-              <div class="card">
-                <div class="card-header">
+            <!-- Recent Activity -->
+            <div class="col-lg-6 mb-4">
+              <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
                   <h5 class="card-title mb-0">Hoạt động gần đây</h5>
+                  <button class="btn btn-sm btn-outline-primary">Xem tất cả</button>
+                </div>
+                <div class="card-body">
+                  <div class="list-group list-group-flush">
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                      <div class="d-flex align-items-center">
+                        <div class="activity-icon bg-success rounded-circle d-flex align-items-center justify-content-center me-3" 
+                             style="width: 32px; height: 32px;">
+                          <i class="bi bi-person-plus text-white"></i>
+                        </div>
+                        <div>
+                          <div class="fw-medium">Người dùng mới được tạo</div>
+                          <small class="text-muted">test.user@talunglogistic.com</small>
+                        </div>
+                      </div>
+                      <small class="text-muted">2 phút trước</small>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                      <div class="d-flex align-items-center">
+                        <div class="activity-icon bg-primary rounded-circle d-flex align-items-center justify-content-center me-3" 
+                             style="width: 32px; height: 32px;">
+                          <i class="bi bi-shield-check text-white"></i>
+                        </div>
+                        <div>
+                          <div class="fw-medium">Role được cập nhật</div>
+                          <small class="text-muted">Thêm quyền admin</small>
+                        </div>
+                      </div>
+                      <small class="text-muted">1 giờ trước</small>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                      <div class="d-flex align-items-center">
+                        <div class="activity-icon bg-warning rounded-circle d-flex align-items-center justify-content-center me-3" 
+                             style="width: 32px; height: 32px;">
+                          <i class="bi bi-key text-white"></i>
+                        </div>
+                        <div>
+                          <div class="fw-medium">Password reset</div>
+                          <small class="text-muted">User: admin</small>
+                        </div>
+                      </div>
+                      <small class="text-muted">2 giờ trước</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- System Health -->
+            <div class="col-lg-6 mb-4">
+              <div class="card h-100">
+                <div class="card-header">
+                  <h5 class="card-title mb-0">Tình trạng hệ thống</h5>
                 </div>
                 <div class="card-body">
                   <div class="list-group list-group-flush">
                     <div class="list-group-item d-flex justify-content-between align-items-center">
                       <div>
-                        <i class="bi bi-person-plus text-success me-2"></i>
-                        Người dùng mới được tạo
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        Keycloak Server
                       </div>
-                      <small class="text-muted">2 phút trước</small>
+                      <span class="badge bg-success">Online</span>
                     </div>
                     <div class="list-group-item d-flex justify-content-between align-items-center">
                       <div>
-                        <i class="bi bi-shield-check text-primary me-2"></i>
-                        Role được cập nhật
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        Database
                       </div>
-                      <small class="text-muted">1 giờ trước</small>
+                      <span class="badge bg-success">Healthy</span>
                     </div>
                     <div class="list-group-item d-flex justify-content-between align-items-center">
                       <div>
-                        <i class="bi bi-key text-warning me-2"></i>
-                        Password reset
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>
+                        Admin API
                       </div>
-                      <small class="text-muted">2 giờ trước</small>
+                      <span class="badge bg-success">Running</span>
+                    </div>
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                      <div>
+                        <i class="bi bi-clock-history text-info me-2"></i>
+                        Last Backup
+                      </div>
+                      <span class="text-muted">2 giờ trước</span>
                     </div>
                   </div>
                 </div>
@@ -164,8 +202,13 @@
 </template>
 
 <script>
+import Sidebar from '../components/Sidebar.vue'
+
 export default {
   name: 'Dashboard',
+  components: {
+    Sidebar
+  },
   data() {
     return {
       stats: {
@@ -175,31 +218,29 @@ export default {
         todayLogins: 3
       }
     }
-  },
-  methods: {
-    logout() {
-      this.$router.push('/')
-    }
   }
 }
 </script>
 
 <style scoped>
-.sidebar {
+.main-content {
+  background-color: #f8f9fa;
   min-height: 100vh;
-  box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
 }
 
-.sidebar .nav-link {
-  border-radius: 0.375rem;
-  margin: 0.125rem 0.5rem;
+.activity-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
 }
 
-.sidebar .nav-link.active {
-  background-color: rgba(255, 255, 255, 0.1);
+.card {
+  border: none;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }
 
-.sidebar .nav-link:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+.card-header {
+  background-color: white;
+  border-bottom: 1px solid #dee2e6;
 }
 </style>
