@@ -2,10 +2,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Khởi tạo Keycloak realm + clients + roles (dev)
-# Yêu cầu: docker-compose đã chạy và Keycloak dev đang hoạt động ở KEYCLOAK_URL trong .env.local
-
-# Load env from project root .env.local (nếu có)
+# Load env
 ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env.local"
 if [ -f "$ENV_FILE" ]; then
   export $(grep -v '^#' "$ENV_FILE" | xargs)
@@ -17,12 +14,18 @@ ADMIN_PASS="${KEYCLOAK_ADMIN_PASSWORD:-adminpass}"
 REALM="${KEYCLOAK_REALM:-talung}"
 
 echo "🚀 Initializing Talung SSO (Keycloak) at $KEYCLOAK_URL"
-echo "⏳ Waiting for Keycloak to be ready..."
+echo "⏳ Waiting for Keycloak (master realm endpoint)..."
 
-# Wait for keycloak
-until curl -s "${KEYCLOAK_URL}" >/dev/null 2>&1; do
-  echo "Waiting for Keycloak..."
-  sleep 5
+# Wait for Keycloak master realm endpoint to respond 200
+RETRIES=60
+SLEEP=5
+for i in $(seq 1 $RETRIES); do
+  if curl -fsS "${KEYCLOAK_URL}/realms/master" >/dev/null 2>&1; then
+    echo "✅ Keycloak is ready"
+    break
+  fi
+  echo "Waiting ($i/$RETRIES)..."
+  sleep $SLEEP
 done
 
 # Get admin token
@@ -33,29 +36,29 @@ TOKEN=$(curl -s -X POST \
   -d "username=${ADMIN_USER}&password=${ADMIN_PASS}&grant_type=password&client_id=admin-cli" \
   | jq -r '.access_token')
 
-if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-  echo "❌ Failed to get admin token. Ensure KEYCLOAK_ADMIN credentials are correct."
+if [ -z "${TOKEN:-}" ] || [ "$TOKEN" = "null" ]; then
+  echo "❌ Failed to get admin token (check admin credentials or Keycloak status)."
   exit 1
 fi
-
 echo "✅ Admin token obtained"
 
-# Create realm
-echo "🏢 Creating realm: ${REALM} (if not exists)..."
-EXISTS=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "${KEYCLOAK_URL}/admin/realms/${REALM}" || true)
-if [ "$EXISTS" = "200" ]; then
-  echo "Realm ${REALM} already exists"
-else
+# Ensure realm exists
+echo "🏢 Ensuring realm '${REALM}'..."
+EXISTS=$(curl -s -o /dev/null -w "%{http_code}" \
+  -H "Authorization: Bearer $TOKEN" "${KEYCLOAK_URL}/admin/realms/${REALM}" || true)
+if [ "$EXISTS" != "200" ]; then
   curl -s -X POST \
     "${KEYCLOAK_URL}/admin/realms" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d "{\"realm\":\"${REALM}\",\"enabled\":true}" >/dev/null
   echo "✅ Realm '${REALM}' created"
+else
+  echo "ℹ️ Realm '${REALM}' exists"
 fi
 
-# Create a public SPA client (task-frontend)
-echo "🔧 Creating client: task-frontend (public, PKCE)"
+# Create clients (idempotent-ish)
+echo "🔧 Creating/ensuring client: task-frontend (public)"
 curl -s -X POST \
   "${KEYCLOAK_URL}/admin/realms/${REALM}/clients" \
   -H "Authorization: Bearer $TOKEN" \
@@ -65,13 +68,11 @@ curl -s -X POST \
     "enabled": true,
     "publicClient": true,
     "protocol": "openid-connect",
-    "redirectUris": ["http://localhost:5174/*"],
-    "webOrigins": ["http://localhost:5174"]
-  }' >/dev/null
-echo "✅ Client 'task-frontend' created (public)"
+    "redirectUris": ["http://localhost:5174/*","http://localhost:5173/*"],
+    "webOrigins": ["http://localhost:5174","http://localhost:5173"]
+  }' >/dev/null || true
 
-# Create a confidential backend client (task-backend)
-echo "🔧 Creating client: task-backend (confidential)"
+echo "🔧 Creating/ensuring client: task-backend (confidential)"
 curl -s -X POST \
   "${KEYCLOAK_URL}/admin/realms/${REALM}/clients" \
   -H "Authorization: Bearer $TOKEN" \
@@ -83,11 +84,10 @@ curl -s -X POST \
     "protocol": "openid-connect",
     "redirectUris": ["http://localhost:3001/*"],
     "webOrigins": ["http://localhost:3001"]
-  }' >/dev/null
-echo "✅ Client 'task-backend' created (confidential)"
+  }' >/dev/null || true
 
-# Create realm roles
-echo "👥 Creating realm roles..."
+# Roles
+echo "👥 Ensuring realm roles..."
 roles=("employee" "manager" "admin" "hr-admin" "system-admin")
 for r in "${roles[@]}"; do
   curl -s -X POST \
@@ -95,7 +95,7 @@ for r in "${roles[@]}"; do
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d "{\"name\":\"$r\"}" >/dev/null || true
-  echo " - role $r ensured"
+  echo " - $r"
 done
 
 echo "🎉 Initialization finished!"

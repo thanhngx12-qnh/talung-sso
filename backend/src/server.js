@@ -1,4 +1,4 @@
-# dir: /talung-sso/backend/src
+// dir: /talung-sso/backend/src
 import express from 'express';
 import morgan from 'morgan';
 import cors from 'cors';

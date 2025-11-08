@@ -1,4 +1,4 @@
-# dir: /talung-sso/backend/src/routes
+// dir: /talung-sso/backend/src/routes
 import express from 'express';
 const router = express.Router();
 
