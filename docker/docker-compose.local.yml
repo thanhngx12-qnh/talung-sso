@@ -1,0 +1,57 @@
+# docker/docker-compose.local.yml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: talung-postgres
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"  # Đổi từ 5432 sang 5433 để tránh conflict
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../scripts/init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - sso_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:21.0.0
+    container_name: talung-keycloak
+    environment:
+      DB_VENDOR: postgres
+      DB_ADDR: postgres
+      DB_DATABASE: keycloak
+      DB_USER: keycloak
+      DB_PASSWORD: password
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_PROXY: edge
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_STRICT_HTTPS: false
+      KC_HTTP_ENABLED: true
+    ports:
+      - "8081:8080"  # Đổi từ 8080 sang 8081 để tránh conflict
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./keycloak/themes:/opt/keycloak/themes
+    networks:
+      - sso_network
+    command: 
+      - start-dev
+
+volumes:
+  postgres_data:
+
+networks:
+  sso_network:
+    driver: bridge
