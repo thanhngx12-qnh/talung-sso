@@ -1,128 +1,101 @@
-#!/bin/bash
-# scripts/init-local.sh
+# dir: /talung-sso/scripts
+#!/usr/bin/env bash
+set -euo pipefail
 
-echo "🚀 Initializing Talung SSO Local Environment..."
+# Khởi tạo Keycloak realm + clients + roles (dev)
+# Yêu cầu: docker-compose đã chạy và Keycloak dev đang hoạt động ở KEYCLOAK_URL trong .env.local
 
-# Wait for Keycloak to be ready with longer timeout
-echo "⏳ Waiting for Keycloak to start..."
-MAX_RETRIES=30
-RETRY_COUNT=0
+# Load env from project root .env.local (nếu có)
+ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env.local"
+if [ -f "$ENV_FILE" ]; then
+  export $(grep -v '^#' "$ENV_FILE" | xargs)
+fi
 
-# Keycloak 21+ doesn't have /auth context path
-until curl -f http://localhost:8081/realms/master > /dev/null 2>&1; do
-  RETRY_COUNT=$((RETRY_COUNT+1))
-  if [ $RETRY_COUNT -gt $MAX_RETRIES ]; then
-    echo "❌ Keycloak failed to start after $MAX_RETRIES retries"
-    exit 1
-  fi
-  echo "Waiting for Keycloak... ($RETRY_COUNT/$MAX_RETRIES)"
-  sleep 10
+KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:18080}"
+ADMIN_USER="${KEYCLOAK_ADMIN:-admin}"
+ADMIN_PASS="${KEYCLOAK_ADMIN_PASSWORD:-adminpass}"
+REALM="${KEYCLOAK_REALM:-talung}"
+
+echo "🚀 Initializing Talung SSO (Keycloak) at $KEYCLOAK_URL"
+echo "⏳ Waiting for Keycloak to be ready..."
+
+# Wait for keycloak
+until curl -s "${KEYCLOAK_URL}" >/dev/null 2>&1; do
+  echo "Waiting for Keycloak..."
+  sleep 5
 done
-
-echo "✅ Keycloak is ready!"
 
 # Get admin token
 echo "🔑 Getting admin token..."
 TOKEN=$(curl -s -X POST \
-  http://localhost:8081/realms/master/protocol/openid-connect/token \
+  "${KEYCLOAK_URL}/realms/master/protocol/openid-connect/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "username=admin&password=admin&grant_type=password&client_id=admin-cli" \
+  -d "username=${ADMIN_USER}&password=${ADMIN_PASS}&grant_type=password&client_id=admin-cli" \
   | jq -r '.access_token')
 
 if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-  echo "❌ Failed to get admin token"
-  echo "Debug: Trying to access Keycloak directly..."
-  curl -v http://localhost:8081/realms/master
+  echo "❌ Failed to get admin token. Ensure KEYCLOAK_ADMIN credentials are correct."
   exit 1
 fi
 
 echo "✅ Admin token obtained"
 
-# Create talung realm
-echo "🏢 Creating talung realm..."
-REALM_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-  http://localhost:8081/admin/realms \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "realm": "talung",
-    "enabled": true,
-    "displayName": "Talung Logistics",
-    "loginWithEmailAllowed": true,
-    "duplicateEmailsAllowed": false,
-    "resetPasswordAllowed": true,
-    "editUsernameAllowed": false,
-    "bruteForceProtected": true
-  }')
-
-if [ "$REALM_RESPONSE" -eq 201 ]; then
-  echo "✅ Realm 'talung' created"
+# Create realm
+echo "🏢 Creating realm: ${REALM} (if not exists)..."
+EXISTS=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "${KEYCLOAK_URL}/admin/realms/${REALM}" || true)
+if [ "$EXISTS" = "200" ]; then
+  echo "Realm ${REALM} already exists"
 else
-  echo "⚠️ Realm may already exist (HTTP $REALM_RESPONSE)"
+  curl -s -X POST \
+    "${KEYCLOAK_URL}/admin/realms" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "{\"realm\":\"${REALM}\",\"enabled\":true}" >/dev/null
+  echo "✅ Realm '${REALM}' created"
 fi
 
-# Create admin-api client
-echo "🔧 Creating admin-api client..."
-CLIENT_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-  http://localhost:8081/admin/realms/talung/clients \
+# Create a public SPA client (task-frontend)
+echo "🔧 Creating client: task-frontend (public, PKCE)"
+curl -s -X POST \
+  "${KEYCLOAK_URL}/admin/realms/${REALM}/clients" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "clientId": "admin-api",
-    "enabled": true,
-    "publicClient": false,
-    "secret": "admin-api-secret",
-    "redirectUris": ["http://localhost:3001/*"],
-    "webOrigins": ["http://localhost:3001"],
-    "protocol": "openid-connect",
-    "attributes": {
-      "access.token.lifespan": 300
-    }
-  }')
-
-if [ "$CLIENT_RESPONSE" -eq 201 ]; then
-  echo "✅ Client 'admin-api' created"
-else
-  echo "⚠️ Client may already exist (HTTP $CLIENT_RESPONSE)"
-fi
-
-# Create admin-frontend client
-echo "🎨 Creating admin-frontend client..."
-FRONTEND_CLIENT_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-  http://localhost:8081/admin/realms/talung/clients \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "clientId": "admin-frontend",
+    "clientId": "task-frontend",
     "enabled": true,
     "publicClient": true,
-    "redirectUris": ["http://localhost:5173/*", "http://localhost:5174/*"],
-    "webOrigins": ["http://localhost:5173", "http://localhost:5174"],
-    "protocol": "openid-connect"
-  }')
+    "protocol": "openid-connect",
+    "redirectUris": ["http://localhost:5174/*"],
+    "webOrigins": ["http://localhost:5174"]
+  }' >/dev/null
+echo "✅ Client 'task-frontend' created (public)"
 
-if [ "$FRONTEND_CLIENT_RESPONSE" -eq 201 ]; then
-  echo "✅ Client 'admin-frontend' created"
-else
-  echo "⚠️ Client may already exist (HTTP $FRONTEND_CLIENT_RESPONSE)"
-fi
+# Create a confidential backend client (task-backend)
+echo "🔧 Creating client: task-backend (confidential)"
+curl -s -X POST \
+  "${KEYCLOAK_URL}/admin/realms/${REALM}/clients" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clientId": "task-backend",
+    "enabled": true,
+    "publicClient": false,
+    "protocol": "openid-connect",
+    "redirectUris": ["http://localhost:3001/*"],
+    "webOrigins": ["http://localhost:3001"]
+  }' >/dev/null
+echo "✅ Client 'task-backend' created (confidential)"
 
 # Create realm roles
 echo "👥 Creating realm roles..."
-roles=("employee" "manager" "director" "admin" "hr-admin" "system-admin")
-
-for role in "${roles[@]}"; do
-  ROLE_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-    http://localhost:8081/admin/realms/talung/roles \
+roles=("employee" "manager" "admin" "hr-admin" "system-admin")
+for r in "${roles[@]}"; do
+  curl -s -X POST \
+    "${KEYCLOAK_URL}/admin/realms/${REALM}/roles" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
-    -d "{\"name\": \"$role\"}")
-  
-  if [ "$ROLE_RESPONSE" -eq 201 ]; then
-    echo "✅ Role '$role' created"
-  else
-    echo "⚠️ Role '$role' may already exist (HTTP $ROLE_RESPONSE)"
-  fi
+    -d "{\"name\":\"$r\"}" >/dev/null || true
+  echo " - role $r ensured"
 done
 
-echo "🎉 Talung SSO initialization completed!"
+echo "🎉 Initialization finished!"

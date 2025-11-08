@@ -1,57 +1,54 @@
-# docker/docker-compose.local.yml
+# dir: /talung-sso/docker
 version: '3.8'
 
 services:
   postgres:
-    image: postgres:15
+    image: postgres:13
     container_name: talung-postgres
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: change-me-PleaseReplace
     ports:
-      - "5433:5432"  # Đổi từ 5432 sang 5433 để tránh conflict
+      - "15432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ../scripts/init-scripts:/docker-entrypoint-initdb.d
+      - ../database/postgres:/var/lib/postgresql/data
+      - ../scripts:/docker-entrypoint-initdb.d
     networks:
-      - sso_network
+      - talung-sso-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U keycloak"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   keycloak:
-    image: quay.io/keycloak/keycloak:21.0.0
+    image: quay.io/keycloak/keycloak:21.1.1
     container_name: talung-keycloak
     environment:
-      DB_VENDOR: postgres
-      DB_ADDR: postgres
-      DB_DATABASE: keycloak
-      DB_USER: keycloak
-      DB_PASSWORD: password
+      KC_DB: postgres
+      KC_DB_URL_HOST: postgres
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: change-me-PleaseReplace
+      KC_HTTP_PORT: 8080
       KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
-      KC_PROXY: edge
-      KC_HOSTNAME_STRICT: false
-      KC_HOSTNAME_STRICT_HTTPS: false
-      KC_HTTP_ENABLED: true
-    ports:
-      - "8081:8080"  # Đổi từ 8080 sang 8081 để tránh conflict
+      KEYCLOAK_ADMIN_PASSWORD: adminpass
+    command: start-dev
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
+    ports:
+      - "18080:8080"
     volumes:
-      - ./keycloak/themes:/opt/keycloak/themes
+      - ../docker/keycloak/themes:/opt/keycloak/themes
+      - ../database/keycloak:/opt/keycloak/data
     networks:
-      - sso_network
-    command: 
-      - start-dev
-
-volumes:
-  postgres_data:
+      - talung-sso-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
 
 networks:
-  sso_network:
+  talung-sso-net:
     driver: bridge

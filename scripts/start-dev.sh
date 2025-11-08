@@ -1,41 +1,28 @@
-#!/bin/bash
-# scripts/start-dev.sh
+# dir: /talung-sso/scripts
+#!/usr/bin/env bash
+set -euo pipefail
 
 echo "🚀 Starting Talung SSO Development Environment..."
 
-# Check if Docker is running
-if ! docker info > /dev/null 2>&1; then
-  echo "❌ Docker is not running. Please start Docker Desktop first."
+# Check Docker
+if ! docker info >/dev/null 2>&1; then
+  echo "❌ Docker not running. Start Docker Desktop and retry."
   exit 1
 fi
 
-# Stop existing containers if any
-echo "🧹 Cleaning up existing containers..."
-docker-compose -f docker/docker-compose.local.yml down
+# Start docker-compose
+echo "🐳 Starting docker-compose services..."
+docker-compose -f docker/docker-compose.local.yml up -d --remove-orphans
 
-# Start Docker services
-echo "🐳 Starting Docker services..."
-docker-compose -f docker/docker-compose.local.yml up -d
+# Wait a bit then run init script
+echo "⏳ Waiting 10s for containers to start..."
+sleep 10
 
-# Wait for services to be ready
-echo "⏳ Waiting for services to start..."
-sleep 30
-
-# Initialize Keycloak realm and clients
-echo "⚙️ Initializing Keycloak..."
+echo "⚙️ Running Keycloak initialization..."
 ./scripts/init-local.sh
 
 echo ""
-echo "✅ Development environment is ready!"
-echo ""
-echo "📊 Keycloak Admin Console: http://localhost:8081/admin"  # Đổi từ 8080 sang 8081
-echo "   👤 Username: admin"
-echo "   🔑 Password: admin"
-echo ""
-echo "🔌 Keycloak Server: http://localhost:8081"  # Đổi từ 8080 sang 8081
-echo "🗄️  PostgreSQL: localhost:5433"  # Đổi từ 5432 sang 5433
-echo "🔧 Backend API: http://localhost:3001"  # Đổi từ 3000 sang 3001
-echo ""
-echo "Next steps:"
-echo "1. Run backend: cd backend && npm run dev"
-echo "2. Run frontend: cd frontend && npm run dev"
+echo "✅ Development environment ready!"
+echo "Keycloak admin console: http://localhost:18080/"
+echo "Backend API: http://localhost:3001"
+echo "Frontend (dev): http://localhost:5174"
