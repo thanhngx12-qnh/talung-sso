@@ -8,6 +8,7 @@ import SilentRenew from './SilentRenew.vue'
 const user = ref(null)
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const secureData = ref(null)
+const meData = ref(null)
 const error = ref(null)
 const path = () => window.location.pathname
 const isCallback = computed(() => path().startsWith('/callback'))
@@ -40,6 +41,22 @@ async function callSecureApi() {
     error.value = e.message || String(e)
   }
 }
+
+async function callMe() {
+  error.value = null
+  meData.value = null
+  try {
+    const u = user.value || await userManager.getUser()
+    if (!u) { error.value = 'Chưa đăng nhập'; return }
+    const res = await fetch(`${apiBase}/api/v1/me`, {
+      headers: { Authorization: `Bearer ${u.access_token}` }
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
+    meData.value = await res.json()
+  } catch (e) {
+    error.value = e.message || String(e)
+  }
+}
 </script>
 
 <template>
@@ -57,11 +74,24 @@ async function callSecureApi() {
         <button @click="login">Đăng nhập</button>
         <button v-if="user" @click="logout">Đăng xuất</button>
         <button v-if="user" @click="callSecureApi">Gọi API bảo vệ</button>
+        <button v-if="user" @click="callMe">Xem claims (/me)</button>
       </div>
 
-      <pre v-if="secureData" style="background:#f7f7f7; padding:12px; border-radius:8px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div>
+          <h3>/secure</h3>
+          <pre v-if="secureData" style="background:#f7f7f7; padding:12px; border-radius:8px;">
 {{ JSON.stringify(secureData, null, 2) }}
-      </pre>
+          </pre>
+        </div>
+        <div>
+          <h3>/me (claims)</h3>
+          <pre v-if="meData" style="background:#f7f7f7; padding:12px; border-radius:8px;">
+{{ JSON.stringify(meData, null, 2) }}
+          </pre>
+        </div>
+      </div>
+
       <p v-if="error" style="color:#c00">{{ error }}</p>
     </div>
   </div>

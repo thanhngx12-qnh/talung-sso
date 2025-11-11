@@ -1,7 +1,7 @@
 // dir: /talung-sso/frontend/src
 import { UserManager } from 'oidc-client-ts';
 
-const base = window.location.origin
+const base = window.location.origin;
 const authority = import.meta.env.VITE_KEYCLOAK_URL
   ? `${import.meta.env.VITE_KEYCLOAK_URL}/realms/${import.meta.env.VITE_KEYCLOAK_REALM}`
   : 'http://localhost:18080/realms/talung';
@@ -17,8 +17,8 @@ export const userManager = new UserManager({
   redirect_uri,
   post_logout_redirect_uri,
   response_type: 'code',
-  scope: 'openid profile email',
-  // Silent renew
+  // thêm "roles" để chắc có claim roles
+  scope: 'openid profile email roles',
   automaticSilentRenew: true,
   silent_redirect_uri,
   monitorSession: false
