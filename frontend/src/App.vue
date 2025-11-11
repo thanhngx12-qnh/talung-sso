@@ -3,15 +3,18 @@
 import { onMounted, ref, computed } from 'vue'
 import { userManager } from './oidc.js'
 import Callback from './callback.js'
+import SilentRenew from './SilentRenew.vue'
 
 const user = ref(null)
 const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const secureData = ref(null)
 const error = ref(null)
-const isCallback = computed(() => window.location.pathname.startsWith('/callback'))
+const path = () => window.location.pathname
+const isCallback = computed(() => path().startsWith('/callback'))
+const isSilentRenew = computed(() => path().startsWith('/silent-renew'))
 
 onMounted(async () => {
-  if (isCallback.value) return
+  if (isCallback.value || isSilentRenew.value) return
   try {
     user.value = await userManager.getUser()
   } catch (e) {
@@ -19,30 +22,19 @@ onMounted(async () => {
   }
 })
 
-async function login() {
-  await userManager.signinRedirect()
-}
-
-async function logout() {
-  await userManager.signoutRedirect()
-}
+async function login() { await userManager.signinRedirect() }
+async function logout() { await userManager.signoutRedirect() }
 
 async function callSecureApi() {
   error.value = null
   secureData.value = null
   try {
     const u = user.value || await userManager.getUser()
-    if (!u) {
-      error.value = 'Chưa đăng nhập'
-      return
-    }
+    if (!u) { error.value = 'Chưa đăng nhập'; return }
     const res = await fetch(`${apiBase}/api/v1/secure`, {
       headers: { Authorization: `Bearer ${u.access_token}` }
     })
-    if (!res.ok) {
-      const txt = await res.text()
-      throw new Error(`HTTP ${res.status}: ${txt}`)
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${await res.text()}`)
     secureData.value = await res.json()
   } catch (e) {
     error.value = e.message || String(e)
@@ -54,7 +46,8 @@ async function callSecureApi() {
   <div style="font-family: system-ui; padding: 16px; line-height: 1.5">
     <h1>Talung SSO Frontend (Vue SFC)</h1>
 
-    <Callback v-if="isCallback" />
+    <SilentRenew v-if="isSilentRenew" />
+    <Callback v-else-if="isCallback" />
 
     <div v-else>
       <p v-if="!user">Chưa đăng nhập.</p>
@@ -73,14 +66,3 @@ async function callSecureApi() {
     </div>
   </div>
 </template>
-
-<style>
-button {
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid #ddd;
-  background: #fff;
-  cursor: pointer;
-}
-button:hover { background: #f3f3f3; }
-</style>

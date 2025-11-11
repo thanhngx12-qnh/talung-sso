@@ -1,0 +1,5 @@
+# dir: /talung-sso/scripts
+employee_id,full_name,email,department,position,roles
+E001,Nguyen Van A,nguyenvana@example.com,Operation,Staff,"employee"
+E002,Tran Thi B,tranthib@example.com,HR,Specialist,"employee,hr-admin"
+E003,Le Van C,levanc@example.com,IT,SysAdmin,"employee,system-admin"
